@@ -77,8 +77,11 @@ VertexTensorboardManager, _vertex_tb_is_stub = vertex_tensorboard_modules()
 
 
 def get_first_step(model, state):
-  if isinstance(model, nn.Module):
-    return int(state.step)
+  if hasattr(state, "step"):
+    step_val = state.step
+    if hasattr(step_val, "get_value"):
+      return int(step_val.get_value())
+    return int(step_val)
   return int(state.optimizer.step.get_value())
 
 
@@ -627,7 +630,7 @@ def train_loop(config, recorder, state=None):
   start_step = get_first_step(model, state)  # this is the start_step for training
   train_utils.validate_completed_steps(start_step, config.steps)
 
-  if isinstance(model, nn.Module):
+  if isinstance(model, nn.Module) or config.enable_diloco:
     jit_model = model
   else:
     jit_model, state = nnx.split(state)
@@ -654,7 +657,7 @@ def train_loop(config, recorder, state=None):
     elif config.shard_optimizer_over_data:
       # NNX: reshard state so params match the data-sharded in_shardings (Zero-1 layout)
       state = jax.device_put(state, state_mesh_shardings)
-    if isinstance(model, nn.Module):
+    if isinstance(model, nn.Module) or config.enable_diloco:
       lower_args = (state, shaped_batch, init_rng)
     else:
       lower_args = (state, shaped_batch)
@@ -668,7 +671,7 @@ def train_loop(config, recorder, state=None):
   metric_logger_instance = metric_logger.MetricLogger(config=config, learning_rate_schedule=learning_rate_schedule)
 
   # Write train config params, num model params, and XLA flags to tensorboard
-  if isinstance(model, nn.Module):
+  if isinstance(model, nn.Module) or config.enable_diloco:
     setup_params = state.params
   else:
     _, setup_params, _ = nnx.split(state.model, nnx.Param, ...)
@@ -684,7 +687,7 @@ def train_loop(config, recorder, state=None):
 
       with jax.profiler.StepTraceAnnotation("train", step_num=step):
         example_batch = data_loader.load_next_batch(rampup_manager=rampup_manager)
-        if isinstance(model, nn.Module):
+        if isinstance(model, nn.Module) or config.enable_diloco:
           # pylint: disable=not-callable
           step_rng_args = (jax.jit(jax.random.fold_in)(init_rng, step),)
         else:
