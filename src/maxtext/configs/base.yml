@@ -195,7 +195,7 @@ logits_dot_in_fp32: false  # whether to use fp32 in logits_dense or shared_embed
 cast_logits_to_fp32: true # whether to cast the logits to fp32. the higher precision is generally beneficial, but it can vary slightly.
 float32_qk_product: false # in dot_product attention, whether to cast to fp32 the inputs to qk product
 float32_logits: false # in dot_product attention, whether to cast to fp32 the inputs to softmax
-mla_qk_head_chunk_size: 0 # Limits HBM footprint by sequentially evaluating the QK matrix across the unsharded local heads dimension natively.
+mla_qk_head_chunk_size: 0 # Limits HBM footprint by sequentially evaluating the QK matrix in the Indexer across the unsharded local heads dimension natively.
 float32_weight_sum: true # whether to use full fp32 precision to sum expert weights for numerical stability
 float32_gate_logits: false # whether to cast inputs to fp32 to compute MoE gate logits for numerical stability
 
@@ -738,6 +738,7 @@ train_data_columns: ['text'] # for DPO dataset containing "chosen" and "rejected
 train_image_column: 'image'
 eval_data_columns: ['text'] # for DPO dataset containing "chosen" and "rejected"
 eval_image_column: 'image'
+default_prompt: ''
 packing: true
 num_epoch: 1
 generate_padding_batch_train: false
@@ -1340,6 +1341,15 @@ sinkhorn_iterations: 20
 #   the expensive sinkhorn iterations, the downside to this approach is that
 #   it is factorial in k.
 enable_mhc_lite: False
+# Whether to use the Pallas TPU kernel implementation for mHC-lite when running on TPU.
+use_mhc_pallas_kernel: False
+# Block size for forward pass of MHC Pallas kernel.
+mhc_pallas_kernel_fwd_block_size: 256
+# Block size for backward pass of MHC Pallas kernel.
+# The backward pass is more memory intensive, so we were running into OOMs with
+# TPU v7x if we go higher. For TPU v6 (Trillium), there is more VMEM, so 256
+# works and provides better results.
+mhc_pallas_kernel_bwd_block_size: 128
 
 ################################## DeepSeek Engram ##################################
 # Indices of transformer layers where Engram are integrated; leave empty [] to disable.
