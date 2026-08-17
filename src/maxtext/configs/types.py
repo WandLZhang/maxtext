@@ -899,6 +899,10 @@ class MoEGeneral(BaseModel):
       False,
       description="Whether to run ragged sort kernels on 1 SparseCore instead of all SparseCores.",
   )
+  moe_use_direct_token_gather: bool = Field(
+      False,
+      description="Whether to gather tokens directly in expert order instead of materializing Top-K copies.",
+  )
   use_gather_mosaic_kernel: bool = Field(
       False,
       description="Whether to use a custom mosaic kernel for token gather ops.",

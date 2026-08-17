@@ -504,6 +504,34 @@ def test_sparse_matmul_repairs_batch_specs_only_without_expert_parallelism(exper
 class RoutedMoeTest(parameterized.TestCase):
   """Routed Mixture of Experts test."""
 
+  @parameterized.parameters(False, True)
+  def test_route_activations_matches_repeat_and_sort(self, compute_gradient):
+    inputs = jnp.arange(24, dtype=jnp.float32).reshape(6, 4)
+    selected_experts = jnp.array(
+        [
+            [[3, 1], [0, 2], [1, 3]],
+            [[2, 0], [3, 2], [0, 1]],
+        ],
+        dtype=jnp.int32,
+    )
+
+    def reference(x):
+      assignment_order = jnp.argsort(jnp.ravel(selected_experts))
+      return jnp.repeat(x, selected_experts.shape[-1], axis=0)[assignment_order]
+
+    def actual(x):
+      return moe._route_activations(x, selected_experts)  # pylint: disable=protected-access
+
+    if compute_gradient:
+      cotangent = jnp.arange(48, dtype=jnp.float32).reshape(12, 4)
+      expected = jax.grad(lambda x: jnp.sum(reference(x) * cotangent))(inputs)
+      result = jax.grad(lambda x: jnp.sum(actual(x) * cotangent))(inputs)
+    else:
+      expected = reference(inputs)
+      result = actual(inputs)
+
+    np.testing.assert_array_equal(result, expected)
+
   def get_expected_output(self, rng, hidden_states, cfg, mesh):
     """Retrieve expected output from Routed Mixture of Experts."""
     model = get_moe_loop(
